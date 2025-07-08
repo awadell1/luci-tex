@@ -55,12 +55,13 @@ def strip_paths_from_command(
 def flatten_latex(
     file_path: Path,
     commands_to_flatten=DEFAULT_COMMANDS,
-    scratch=TemporaryDirectory(),
+    scratch=None,
 ):
     """
     Recursively flattens a LaTeX file by replacing \input and \include with actual content.
     Returns the flattened LaTeX as a string.
     """
+    scratch = scratch or TemporaryDirectory()
     tex_path = Path(file_path).resolve()
 
     if not tex_path.exists():
@@ -119,7 +120,7 @@ def create_archive(archive: str, files: dict[str, Path]):
                 print(f"Warning: {src} not found and will not be added to the zip: {e}")
 
 
-def validate_archive(archive: str, mainfile: str):
+def validate_archive(archive: Path, mainfile: str):
     with TemporaryDirectory() as temp_dir:
         with zipfile.ZipFile(archive, "r") as zipf:
             zipf.extractall(temp_dir)
@@ -133,14 +134,47 @@ def validate_archive(archive: str, mainfile: str):
         )
 
 
-def archive(main: str, output: str | None = None):
-    output = output or str(Path(main).with_suffix(".zip"))
+def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):
+    with TemporaryDirectory() as temp_dir:
+        with zipfile.ZipFile(archive, "a") as zipf:
+            zipf.extractall(temp_dir)
+
+            run(
+                f"tectonic --keep-intermediates {main}",
+                cwd=temp_dir,
+                capture_output=True,
+                shell=True,
+                check=True,
+            )
+
+            # Look for bbl files
+            bbl_deps = {}
+            for _, file in deps.items():
+                if file.suffix != ".bib":
+                    continue
+                bbl_file = Path(temp_dir, file.with_suffix(".bbl").name)
+                if bbl_file.exists():
+                    bbl_deps[bbl_file.name] = bbl_file
+
+            # Add bbl files to archive
+            for file in Path(temp_dir).glob("*.bbl"):
+                zipf.write(file, file.name)
+
+
+def archive(
+    main: Path, output: Path | None = None, validate: bool = True, bbl: bool = True
+):
+    output = output or Path(main).with_suffix(".zip")
     with TemporaryDirectory() as scratch:
         main_text, deps = flatten_latex(main, scratch=scratch)
         with NamedTemporaryFile(dir=scratch) as fid:
             fid.write(main_text.encode("utf-8"))
             fid.flush()
-            deps[Path(main).name] = Path(fid.name)
+            deps[main.name] = Path(fid.name)
             create_archive(output, deps)
 
-    validate_archive(output, Path(main).name)
+    if bbl:
+        add_bbl_file(output, main.name, deps)
+
+    if validate:
+        validate_archive(output, main.name)
