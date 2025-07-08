@@ -8,6 +8,8 @@ from tempfile import TemporaryDirectory, NamedTemporaryFile
 DEFAULT_COMMANDS = [
     "documentclass",
     "includegraphics",
+    "addbibresource",
+    "bibliography",
 ]
 
 
@@ -39,6 +41,9 @@ def strip_paths_from_command(
             canidates = list(full_path.parent.glob(filename + ".*"))
             if len(canidates) == 1:
                 full_path = canidates[0]
+            elif len(canidates) == 0:
+                print("No matches for ", full_path)
+                return match.group(0)
 
         replacements[full_path.name] = full_path
         return updated
