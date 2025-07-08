@@ -1,9 +1,9 @@
+import logging
 import re
 import zipfile
 from pathlib import Path
 from subprocess import run
-from tempfile import TemporaryDirectory, NamedTemporaryFile
-
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 DEFAULT_COMMANDS = [
     "documentclass",
@@ -42,7 +42,7 @@ def strip_paths_from_command(
             if len(canidates) == 1:
                 full_path = canidates[0]
             elif len(canidates) == 0:
-                print("No matches for ", full_path)
+                logging.debug("No matches for %s", full_path)
                 return match.group(0)
 
         replacements[full_path.name] = full_path
@@ -55,6 +55,7 @@ def strip_paths_from_command(
 def flatten_latex(
     file_path: Path,
     commands_to_flatten=DEFAULT_COMMANDS,
+    root: Path | None = None,
     scratch=None,
 ):
     """
@@ -63,6 +64,7 @@ def flatten_latex(
     """
     scratch = scratch or TemporaryDirectory()
     tex_path = Path(file_path).resolve()
+    root = root or tex_path.parent
 
     if not tex_path.exists():
         raise FileNotFoundError(f"File not found: {tex_path}")
@@ -86,8 +88,13 @@ def flatten_latex(
         match = input_pattern.match(stripped_line)
         if match:
             pre, cmd, filename, post = match.groups()
-            inc_path = tex_path.parent.joinpath(filename).with_suffix(".tex")
-            included_text, deps = flatten_latex(inc_path)
+            inc_path = root.joinpath(filename).with_suffix(".tex")
+            included_text, deps = flatten_latex(
+                inc_path,
+                root=root,
+                commands_to_flatten=commands_to_flatten,
+                scratch=scratch,
+            )
             dependencies.update(deps)
             flattened_lines.append(included_text)
 
@@ -117,7 +124,9 @@ def create_archive(archive: str, files: dict[str, Path]):
             try:
                 zipf.write(src, dst)
             except FileNotFoundError as e:
-                print(f"Warning: {src} not found and will not be added to the zip: {e}")
+                logging.warning(
+                    "%s not found and will not be added to the zip: %s", src, e
+                )
 
 
 def validate_archive(archive: Path, mainfile: str):
@@ -146,15 +155,6 @@ def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):
                 shell=True,
                 check=True,
             )
-
-            # Look for bbl files
-            bbl_deps = {}
-            for _, file in deps.items():
-                if file.suffix != ".bib":
-                    continue
-                bbl_file = Path(temp_dir, file.with_suffix(".bbl").name)
-                if bbl_file.exists():
-                    bbl_deps[bbl_file.name] = bbl_file
 
             # Add bbl files to archive
             for file in Path(temp_dir).glob("*.bbl"):
