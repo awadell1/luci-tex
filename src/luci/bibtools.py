@@ -48,7 +48,7 @@ def run_bibtex_tidy_dedupe(input_bib: Path) -> tuple[str, dict[str, str]]:
         "bibtex-tidy",
         "--duplicates=doi,citation,key",
         "--merge=first",
-        "--omit=abstract",
+        "--omit=abstract,note",
         "--remove-empty-fields",
         "--remove-dupe-fields",
         "--escape",
