@@ -10,17 +10,36 @@ DUPLICATE_RE = re.compile(
     r"DUPLICATE_ENTRY: Duplicate removed\. Entry (\S+) .* entry (\S+)\."
 )
 
+# Emoji regex covering general emoji ranges
+EMOJI_RE = re.compile(
+    "[\U0001f600-\U0001f64f"  # emoticons
+    "\U0001f300-\U0001f5ff"  # symbols & pictographs
+    "\U0001f680-\U0001f6ff"  # transport & map symbols
+    "\U0001f1e0-\U0001f1ff"  # flags (iOS)
+    "\U00002702-\U000027b0"
+    "\U000024c2-\U0001f251"
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def strip_emojis(text: str) -> str:
+    """Remove emoji characters from text."""
+    return EMOJI_RE.sub("", text)
+
 
 def merge_bibtex_files(bibfiles: list[Path], merged_path: Path):
-    """
-    Merge multiple BibTeX files into a single file.
-    Earlier files take precedence by being placed first.
-    """
-    with merged_path.open("w", encoding="utf-8") as outfile:
-        for bibfile in bibfiles:
-            outfile.write(bibfile.read_text(encoding="utf-8"))
-            outfile.write("\n")
-    typer.echo(f"Merged {len(bibfiles)} files into {merged_path}")
+    """Merge multiple BibTeX files into a single file (earlier takes precedence)."""
+    merged_content = ""
+    for bibfile in bibfiles:
+        typer.echo(f"Merging {bibfile}")
+        merged_content += bibfile.read_text(encoding="utf-8") + "\n"
+
+    # Strip emojis from merged content
+    cleaned_content = strip_emojis(merged_content)
+
+    merged_path.write_text(cleaned_content, encoding="utf-8")
+    typer.echo(f"Merged and cleaned {len(bibfiles)} files into {merged_path}")
 
 
 def run_bibtex_tidy_dedupe(input_bib: Path) -> tuple[str, dict[str, str]]:
