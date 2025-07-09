@@ -1,151 +1,111 @@
-import http.client as httplib
-import json
+import subprocess
 import re
-import sys
+import json
 from pathlib import Path
-from urllib.parse import urlencode
+import tempfile
 
-import bibtexparser
 import typer
-from bibtexparser.bwriter import BibTexWriter
-from tqdm import tqdm
-from unidecode import unidecode
 
-DOI_REGEX = re.compile(r'doi\.org/([^"^<^>]+)')
-
-
-def normalize(string):
-    string = re.sub(r'[{}\\\'"^]', "", string)
-    string = re.sub(r"\$.*?\$", "", string)
-    return unidecode(string)
+DUPLICATE_RE = re.compile(
+    r"DUPLICATE_ENTRY: Duplicate removed\. Entry (\S+) .* entry (\S+)\."
+)
 
 
-def get_authors(entry) -> list[str] | None:
-    def get_last_name(authors):
-        for author in authors:
-            author = author.strip(" ")
-            if "," in author:
-                yield author.split(",")[0]
-            elif " " in author:
-                yield author.split(" ")[-1]
-            else:
-                yield author
-
-    authors = None
-    for k in ["author", "editor"]:
-        if k in entry:
-            authors = entry[k]
-            break
-    if authors is None:
-        return None
-
-    authors = normalize(authors).split("and")
-    return get_last_name(authors)
+def merge_bibtex_files(bibfiles: list[Path], merged_path: Path):
+    """
+    Merge multiple BibTeX files into a single file.
+    Earlier files take precedence by being placed first.
+    """
+    with merged_path.open("w", encoding="utf-8") as outfile:
+        for bibfile in bibfiles:
+            outfile.write(bibfile.read_text(encoding="utf-8"))
+            outfile.write("\n")
+    typer.echo(f"Merged {len(bibfiles)} files into {merged_path}")
 
 
-def searchdoi(title: str, authors: list[str]) -> str | None:
-    for author in authors:
-        params = urlencode(
-            {
-                "titlesearch": "titlesearch",
-                "auth2": author,
-                "atitle2": title,
-                "multi_hit": "on",
-                "article_title_search": "Search",
-                "queryType": "author-title",
-            }
-        )
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "text/html",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Host": "www.crossref.org",
-        }
-        conn = httplib.HTTPConnection("www.crossref.org:80")
-        conn.request("POST", "/guestquery/", params, headers)
-        response = conn.getresponse()
-        data = response.read()
-        conn.close()
+def run_bibtex_tidy_dedupe(input_bib: Path) -> tuple[str, dict[str, str]]:
+    """Run bibtex-tidy to deduplicate, returning (deduplicated text, old→new mapping)."""
+    cmd = [
+        "bibtex-tidy",
+        "--duplicates=doi,citation,key",
+        "--merge=first",
+        "--omit=abstract",
+        "--remove-empty-fields",
+        "--remove-dupe-fields",
+        "--escape",
+        "--sort-fields",
+        "--strip-comments",
+        "--v2",
+        str(input_bib),
+    ]
+    typer.echo(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
 
-        if m := DOI_REGEX.search(data.decode()):
-            return m.group(0)
+    if result.returncode != 0:
+        typer.echo("bibtex-tidy failed:")
+        typer.echo(result.stdout)
+        typer.echo(result.stderr)
+        raise RuntimeError("bibtex-tidy failed")
 
-    return None
-
-
-def add_dois_to_bib(bibfile: Path, cache: Path = Path("doi_cache.json")):
-    with open(bibfile, "r") as fid:
-        btp = bibtexparser.bparser.BibTexParser(ignore_nonstandard_types=False)
-        bib = bibtexparser.load(fid, btp)
-
-    doi_cache = json.loads(cache.read_text()) if cache.exists() else {}
-
-    for entry in tqdm(bib.entries, desc="Adding DOIs"):
-        id = entry["ID"]
-        if "doi" not in entry or entry["doi"].isspace():
-            authors = get_authors(entry)
-            if authors is None:
-                continue
-
-            if id in doi_cache and (doi := doi_cache[id]) is not None:
-                entry["doi"] = doi
-            else:
-                if (doi := searchdoi(entry["title"], authors)) is not None:
-                    entry["doi"] = doi
-                doi_cache[id] = doi
-        else:
-            doi_cache[id] = entry["doi"]
-
-    cache.write_text(json.dumps(doi_cache, indent=2))
-    return bib
-
-
-def add_doi(
-    bibfiles: list[Path],
-    cache: Path = Path("doi_cache.json"),
-    output: Path | None = None,
-):
-    output = output or bibfiles[0]
-    bibs = []
-    for bibfile in tqdm(bibfiles):
-        bibs.append(add_dois_to_bib(bibfile, cache))
-
-    writer = BibTexWriter()
-    with open(output, "w") as fid:
-        for bib in bibs:
-            fid.write(writer.write(bib))
-
-
-def parse_tidy_dups(
-    input: typer.FileText = sys.stdin, output: typer.FileTextWrite = sys.stdout
-):
-    update_pattern = re.compile(r"DUPLICATE_ENTRY:.*?Entry (\S+) .*?entry (\S+)\.")
-
+    # Parse duplicate mappings from stderr
     key_updates = {}
-    for line in input:
-        match = update_pattern.match(line.strip())
-        if match:
-            old_key, new_key = match.groups()
+    for line in result.stderr.splitlines():
+        print(line)
+        if m := DUPLICATE_RE.search(line):
+            old_key, new_key = m.groups()
             key_updates[old_key] = new_key
 
-    json.dump(key_updates, output, indent=2)
+    return result.stdout, key_updates
 
 
-def update_citation(duplicate_keys: typer.FileText, files: list[str]):
-    key_updates = json.loads(duplicate_keys.read())
+def merge_and_dedupe(
+    bibfiles: list[Path],
+    output: Path = Path("merged.bib"),
+    mapping: Path = Path("duplicate_keys.json"),
+):
+    """
+    Merge multiple BibTeX files, deduplicate, and write output and removed key map.
+    Earlier files take precedence.
+    """
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".bib") as tmp:
+        merged_path = Path(tmp.name)
+        tmp.close()
+
+    try:
+        merge_bibtex_files(bibfiles, merged_path)
+
+        dedup_text, key_updates = run_bibtex_tidy_dedupe(merged_path)
+
+        output.write_text(dedup_text, encoding="utf-8")
+        mapping.write_text(json.dumps(key_updates, indent=2))
+        typer.echo(f"Wrote deduplicated bib to {output}")
+        typer.echo(f"Wrote deduplication key map to {mapping}")
+
+    finally:
+        merged_path.unlink()  # Clean up temporary file
+
+
+def update_citation(duplicate_keys: Path, files: list[Path]):
+    """
+    Update citations in LaTeX files based on duplicate key mappings from a JSON file.
+    """
+    key_updates = json.loads(duplicate_keys.read_text())
     cite_pattern = re.compile(r"(\\cite\w*\{([^}]+)\})")
 
     def replace_cite_keys(match):
         cite_command = match.group(1)
         keys_str = match.group(2)
         keys = [k.strip() for k in keys_str.split(",")]
-        updated_keys = [key_updates.get(k, k) for k in keys]
+        updated_keys = [
+            key_updates.get(k, k) for k in keys if key_updates.get(k, k) is not None
+        ]
         return f"{cite_command.split('{')[0]}{{{','.join(updated_keys)}}}"
 
     for file in files:
         with open(file, "r") as f:
-            with open(file + ".tmp", "w") as tmp:
-                for line in f:
-                    tmp.write(cite_pattern.sub(replace_cite_keys, line))
+            updated = []
+            for line in f:
+                updated.append(cite_pattern.sub(replace_cite_keys, line))
 
-        Path(file + ".tmp").rename(file)
+        with open(file, "w") as f:
+            f.writelines(updated)

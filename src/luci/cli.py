@@ -1,11 +1,10 @@
 import typer
 
 from .archive import archive
-from .bibtools import add_doi, parse_tidy_dups, update_citation
+from .bibtools import merge_and_dedupe, update_citation
 
 cli = typer.Typer()
 
-cli.command("add-doi")(add_doi)
-cli.command("parse-dups")(parse_tidy_dups)
+cli.command("merge-bibs")(merge_and_dedupe)
 cli.command("fix-dups")(update_citation)
 cli.command()(archive)
