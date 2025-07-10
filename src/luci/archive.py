@@ -1,5 +1,6 @@
 import logging
 import re
+import sys
 import zipfile
 from pathlib import Path
 from subprocess import run
@@ -75,17 +76,19 @@ def flatten_latex(
     flattened_lines = []
     dependencies: dict[str, Path] = {}
     input_pattern = re.compile(r"^(.*?)\\(input|include)\{([^}]+)\}(.*)$")
+    comment_line = re.compile(r"^\s*%")
 
     for line in lines:
         # Skip comments entirely when searching for commands
-        stripped_line = line.split("%")[0]
+        if comment_line.match(line):
+            continue
 
         # Flatten commands
         for cmd in commands_to_flatten:
             line, deps = strip_paths_from_command(line, cmd)
             dependencies.update(deps)
 
-        match = input_pattern.match(stripped_line)
+        match = input_pattern.match(line)
         if match:
             pre, cmd, filename, post = match.groups()
             inc_path = root.joinpath(filename).with_suffix(".tex")
@@ -134,13 +137,51 @@ def validate_archive(archive: Path, mainfile: str):
         with zipfile.ZipFile(archive, "r") as zipf:
             zipf.extractall(temp_dir)
 
-        run(
-            f"tectonic {mainfile}",
+        result = run(
+            f"tectonic --keep-logs {mainfile}",
             cwd=temp_dir,
             capture_output=True,
             shell=True,
-            check=True,
+            encoding="utf-8",
         )
+
+        if result.returncode != 0:
+            logging.error("Archive valiation failed")
+            print(result.stdout, file=sys.stdout)
+            print(result.stderr, file=sys.stderr)
+            for log_file in Path(temp_dir).glob("*.log"):
+                print(f"{log_file.name}:", file=sys.stderr)
+                print(log_file.read_text(), file=sys.stderr)
+            raise RuntimeError("Archive valiation failed")
+
+        scan_latex_log(Path(temp_dir).joinpath(mainfile).with_suffix(".log"))
+
+
+def scan_latex_log(log_path: Path):
+    log_text = Path(log_path).read_text(encoding="utf-8")
+
+    # Define patterns and their reporting levels (compile lazily here)
+    patterns = {
+        "Undefined Citations": {
+            "pattern": r"(?:Package (?:natbib|biblatex) Warning: Citation|LaTeX Warning: Citation) [`'](.+?)['`].+undefined",
+            "level": logging.WARNING,
+        },
+        "Undefined References": {
+            "pattern": r"LaTeX Warning: Reference [`']([^`']+)[`'] on page",
+            "level": logging.WARNING,
+        },
+        "Missing Files": {
+            "pattern": r"! LaTeX Error: File [`'](.+?)['`] not found.",
+            "level": logging.ERROR,
+        },
+    }
+
+    for label, info in patterns.items():
+        regex = re.compile(info["pattern"], re.MULTILINE)
+        unique_matches = set(regex.findall(log_text))
+
+        if unique_matches:
+            logging.log(info["level"], "%s: %s", label, ", ".join(unique_matches))
 
 
 def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):
@@ -162,7 +203,7 @@ def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):
 
 
 def archive(
-    main: Path, output: Path | None = None, validate: bool = True, bbl: bool = True
+    main: Path, output: Path | None = None, validate: bool = True, bbl: bool = False
 ):
     output = output or Path(main).with_suffix(".zip")
     with TemporaryDirectory() as scratch:
