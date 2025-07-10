@@ -2,7 +2,7 @@ import re
 import logging
 from pathlib import Path
 
-ACRODEF_PATTERN = re.compile(r"\\acrodef\{(.+?)\}\{(.+?)\}")
+ACRODEF_PATTERN = re.compile(r"\\acro(?:def)?\{(.+?)\}\{(.+?)\}")
 
 
 def parse_acrodefs_from_file(path: Path) -> dict[str, str]:
@@ -59,7 +59,7 @@ def merge_acrodef_files(file_paths: list[Path]) -> dict[str, str]:
     return merged
 
 
-def format_acrodefs(acro_map: dict[str, str]) -> str:
+def format_acrodefs(acro_map: dict[str, str], command: str) -> str:
     """
     Format acrodefs into a single string for output.
 
@@ -69,13 +69,18 @@ def format_acrodefs(acro_map: dict[str, str]) -> str:
     Returns:
         Formatted string of \\acro{} entries.
     """
-    lines = [f"\\acro{{{short}}}{{{long}}}" for short, long in sorted(acro_map.items())]
+    lines = [
+        f"\\{command}{{{short}}}{{{long}}}" for short, long in sorted(acro_map.items())
+    ]
     return "\n".join(lines)
 
 
-def merge_acronyms(files: list[Path], output: Path | None = None):
+def merge_acronyms(
+    files: list[Path], output: Path | None = None, command: str = "acro"
+):
+    """Extract and merge acronyms from multiple LaTeX files into a single file"""
     merged_acros = merge_acrodef_files(files)
-    merged = format_acrodefs(merged_acros)
+    merged = format_acrodefs(merged_acros, command)
     if output:
         output.write_text(merged)
     else:
