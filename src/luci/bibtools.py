@@ -54,6 +54,7 @@ def run_bibtex_tidy_dedupe(input_bib: Path) -> tuple[str, dict[str, str]]:
         "--escape",
         "--sort-fields",
         "--strip-comments",
+        "--modify",
         "--v2",
         str(input_bib),
     ]
@@ -68,13 +69,13 @@ def run_bibtex_tidy_dedupe(input_bib: Path) -> tuple[str, dict[str, str]]:
 
     # Parse duplicate mappings from stderr
     key_updates = {}
-    for line in result.stderr.splitlines():
+    for line in result.stdout.splitlines():
         print(line)
         if m := DUPLICATE_RE.search(line):
             old_key, new_key = m.groups()
             key_updates[old_key] = new_key
 
-    return result.stdout, key_updates
+    return input_bib.read_text(), key_updates
 
 
 def merge_and_dedupe(
