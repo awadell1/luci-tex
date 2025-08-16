@@ -83,9 +83,19 @@ def merge_and_dedupe(
     output: Path = Path("merged.bib"),
     mapping: Path = Path("duplicate_keys.json"),
 ):
-    """
-    Merge multiple BibTeX files, deduplicate, and write output and removed key map.
+    """Merge multiple BibTeX files, deduplicate, and write output and removed key map.
     Earlier files take precedence.
+
+    This function takes a list of BibTeX files, merges them into a single file,
+    and then uses `bibtex-tidy` to deduplicate the entries. The deduplicated
+    BibTeX file is written to the specified output path. A JSON file containing
+    a mapping of the removed duplicate keys to the keys that were kept is also
+    generated.
+
+    Args:
+        bibfiles: A list of paths to the BibTeX files to merge.
+        output: The path to write the merged and deduplicated BibTeX file to.
+        mapping: The path to write the JSON file with the duplicate key mappings to.
     """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".bib") as tmp:
         merged_path = Path(tmp.name)
