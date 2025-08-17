@@ -21,6 +21,7 @@ luci --help
 
 `luci` provides the following commands:
 
+* `check`: Check latex build for errors.
 * `merge-bibs`: Merge and deduplicate bib files.
 * `fix-dups`: Fix duplicate citations.
 * `archive`: Archive the project.
