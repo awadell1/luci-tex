@@ -18,8 +18,13 @@ dependencies = [
 [project.scripts]
 luci = "luci.__main__:cli"
 
-[project.optional-dependencies]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
 dev = [
+    "pytest>=8.4.1",
     "ruff>=0.12.1",
 ]
 docs = [
@@ -29,7 +34,3 @@ docs = [
     "myst-parser>=2.0.0",
     "sphinx-click>=5.1.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
