@@ -22,7 +22,7 @@ luci --help
 `luci` provides the following commands:
 
 * `check`: Check latex build for errors.
-* `merge-bibs`: Merge and deduplicate bib files.
+* `merge-bibs`: Merge and de-duplicate bib files.
 * `fix-dups`: Fix duplicate citations.
 * `archive`: Archive the project.
 * `merge-acronyms`: Merge acronyms.
@@ -40,11 +40,11 @@ uv pip install -e .[dev,docs]
 Then, you can run the tests with:
 
 ```shell
-pytest
+uv run pytest
 ```
 
 And build the documentation with:
 
 ```shell
-cd docs && uv run make html
+uv run --group docs sphinx-autobuild docs build/html
 ```

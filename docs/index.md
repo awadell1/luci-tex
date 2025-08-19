@@ -24,6 +24,15 @@ For developers who want to use `luci`'s functionality in their own Python code, 
 source/modules
 ```
 
+## Project
+
+```{toctree}
+:maxdepth: 1
+:caption: Project
+
+changelog
+```
+
 # Indices and tables
 
 * {ref}`genindex`
