@@ -16,4 +16,3 @@ jobs:
           cache-dependency-glob: pyproject.toml
       - name: Run pre-commit
         run: uv run --only-group dev pre-commit run --all
-

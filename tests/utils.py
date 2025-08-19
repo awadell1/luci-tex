@@ -44,4 +44,3 @@ def latex_project(tmp_path: Path) -> LatexProject:
     )
 
     return LatexProject(main=main, inc=inc, img=img, cls=cls)
-

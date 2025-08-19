@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from luci.cli import cli
+
 from tests.utils import write
 
 
@@ -14,7 +15,9 @@ def test_check_parses_log_and_json_output(tmp_path: Path, cli_runner):
             [
                 "(./main.tex)",
                 "LaTeX Warning: Citation `foo' on page 3 undefined on input line 12.",
-                "Overfull \\hbox (15.0pt too wide) in paragraph at lines 100--101".replace("\\\\", "\\"),
+                "Overfull \\hbox (15.0pt too wide) in paragraph at lines 100--101".replace(
+                    "\\\\", "\\"
+                ),
                 "[ 3 ]",
             ]
         ),

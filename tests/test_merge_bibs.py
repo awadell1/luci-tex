@@ -2,13 +2,15 @@ import json
 from pathlib import Path
 
 import pytest
-
-from luci.cli import cli
 from luci import bibtools as bib
+from luci.cli import cli
+
 from tests.utils import write
 
 
-def test_merge_bibs_cli_monkeypatched(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli_runner):
+def test_merge_bibs_cli_monkeypatched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli_runner
+):
     # Prepare two simple bib files
     b1 = tmp_path / "a.bib"
     b2 = tmp_path / "b.bib"
@@ -17,7 +19,7 @@ def test_merge_bibs_cli_monkeypatched(tmp_path: Path, monkeypatch: pytest.Monkey
 
     # Monkeypatch the dedupe step so we don't require bibtex-tidy on CI
     def fake_run_dedupe(p: Path):
-        merged = (b1.read_text() + b2.read_text())
+        merged = b1.read_text() + b2.read_text()
         return merged, {"k2": "k1"}
 
     monkeypatch.setattr(bib, "run_bibtex_tidy_dedupe", fake_run_dedupe)
@@ -41,4 +43,3 @@ def test_merge_bibs_cli_monkeypatched(tmp_path: Path, monkeypatch: pytest.Monkey
     assert out.exists() and map_json.exists()
     # Mapping should reflect our fake dedupe
     assert json.loads(map_json.read_text()) == {"k2": "k1"}
-

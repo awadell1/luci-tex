@@ -1,11 +1,13 @@
 import zipfile
 from pathlib import Path
 
-from luci.cli import cli
 import pytest
+from luci.cli import cli
 
 
-def test_archive_builds_zip_without_validation(latex_project, tmp_path: Path, cli_runner, monkeypatch: pytest.MonkeyPatch):
+def test_archive_builds_zip_without_validation(
+    latex_project, tmp_path: Path, cli_runner, monkeypatch: pytest.MonkeyPatch
+):
     # Run from the LaTeX project directory so relative asset paths resolve
     monkeypatch.chdir(tmp_path)
     outzip = tmp_path / "main.zip"
