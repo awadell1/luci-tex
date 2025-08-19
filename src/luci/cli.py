@@ -1,8 +1,8 @@
 import typer
 
+from .acromerge import merge_acronyms
 from .archive import archive
 from .bibtools import merge_and_dedupe, update_citation
-from .acromerge import merge_acronyms
 from .check import check
 
 cli = typer.Typer()

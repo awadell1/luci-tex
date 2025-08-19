@@ -40,4 +40,3 @@ luci.bibtools module
    :undoc-members:
    :show-inheritance:
 ```
-

@@ -1,5 +1,5 @@
-import re
 import logging
+import re
 from pathlib import Path
 
 # Matches \acro{<id>}[<short>]{<long>} and \acrodef{<id>}[<short>]{<long>}

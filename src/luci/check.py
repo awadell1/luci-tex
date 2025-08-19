@@ -1,10 +1,11 @@
-import re
-import typer
 import json
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, Sequence, Optional
+from typing import Iterable, Optional, Sequence
+
+import typer
 
 
 class Severity(str, Enum):
@@ -117,7 +118,9 @@ def _merge_issue(existing: Issue | None, inc: Issue) -> Issue:
 
 
 # Detectors
-def _detect_citation(lines: list[str], i: int, line: str, current_file: Path | None) -> Issue | None:
+def _detect_citation(
+    lines: list[str], i: int, line: str, current_file: Path | None
+) -> Issue | None:
     if "Warning: Citation" not in line or "undefined" not in line:
         return None
     m_key = re.search(r"[`'](.+?)['`]", line)
@@ -135,7 +138,9 @@ def _detect_citation(lines: list[str], i: int, line: str, current_file: Path | N
     return Issue("Undefined citation", key, Severity.WARNING, None, (loc,))
 
 
-def _detect_reference(lines: list[str], i: int, line: str, current_file: Path | None) -> Issue | None:
+def _detect_reference(
+    lines: list[str], i: int, line: str, current_file: Path | None
+) -> Issue | None:
     if "LaTeX Warning:" not in line or "undefined" not in line:
         return None
     if " Reference " not in line and " Hyper reference " not in line:
@@ -155,7 +160,9 @@ def _detect_reference(lines: list[str], i: int, line: str, current_file: Path | 
     return Issue("Undefined reference", key, Severity.WARNING, None, (loc,))
 
 
-def _detect_missing_file(lines: list[str], i: int, line: str, current_file: Path | None) -> Issue | None:
+def _detect_missing_file(
+    lines: list[str], i: int, line: str, current_file: Path | None
+) -> Issue | None:
     if "! LaTeX Error: File" not in line or "not found" not in line:
         return None
     m_key = re.search(r"File [`'](.+?)['`] not found", line)
@@ -169,7 +176,9 @@ def _detect_missing_file(lines: list[str], i: int, line: str, current_file: Path
     return Issue("Missing file", filename, Severity.ERROR, None, (loc,))
 
 
-def _detect_overfull(line: str, current_file: Path | None, *, threshold_pt: float) -> Issue | None:
+def _detect_overfull(
+    line: str, current_file: Path | None, *, threshold_pt: float
+) -> Issue | None:
     m_over = _OVERFULL_RE.search(line)
     if not m_over:
         return None
@@ -206,7 +215,9 @@ def _scan_single_log(log_path: Path, *, overflow_threshold_pt: float) -> list[Is
 
         over = _detect_overfull(line, current, threshold_pt=overflow_threshold_pt)
         if over is not None:
-            over = Issue(over.kind, over.message, over.severity, log_path, over.locations)
+            over = Issue(
+                over.kind, over.message, over.severity, log_path, over.locations
+            )
             key = (over.kind, over.message)
             collected[key] = _merge_issue(collected.get(key), over)
 
@@ -303,6 +314,7 @@ def check(
         return " ".join(parts) if parts else None
 
     if json_output:
+
         def _loc_to_obj(loc: Location) -> dict:
             obj: dict = {}
             if loc.file is not None:
@@ -328,7 +340,9 @@ def check(
     elif issues:
         for issue in issues:
             prefix = (
-                "ERROR" if issue.severity == Severity.ERROR else "WARN"
+                "ERROR"
+                if issue.severity == Severity.ERROR
+                else "WARN"
                 if issue.severity == Severity.WARNING
                 else "INFO"
             )
