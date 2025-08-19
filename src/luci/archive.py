@@ -11,6 +11,10 @@ DEFAULT_COMMANDS = [
     "includegraphics",
     "addbibresource",
     "bibliography",
+    "RequirePackage",
+    "usepackage",
+    "InputIfFileExists",
+    "templatetype",
 ]
 
 
@@ -35,7 +39,21 @@ def strip_paths_from_command(
 
     def replacer(match):
         prefix = match.group(1)
-        full_path = Path(match.group(2).strip())
+        arg = match.group(2).strip()
+        # If the argument contains a macro, try to include matching local files
+        # but don't modify the LaTeX content.
+        if "\\" in arg:
+            macro_path = Path(arg)
+            parent = macro_path.parent
+            name_part = macro_path.name
+            static_prefix = name_part.split("\\", 1)[0]
+            static_suffix = Path(name_part).suffix
+            if static_prefix:
+                for c in parent.glob(static_prefix + "*" + static_suffix):
+                    replacements[c.name] = c
+            return match.group(0)
+
+        full_path = Path(arg)
         filename = full_path.name
         updated = prefix + "{" + filename + "}"
         if not full_path.exists() and full_path.suffix == "":
@@ -45,6 +63,38 @@ def strip_paths_from_command(
             elif len(canidates) == 0:
                 logging.debug("No matches for %s", full_path)
                 return match.group(0)
+            else:
+                # Prefer an extension based on the command
+                pref_exts: dict[str, list[str]] = {
+                    "documentclass": [".cls"],
+                    "addbibresource": [".bib"],
+                    "bibliography": [".bib"],
+                    "RequirePackage": [".sty"],
+                    "usepackage": [".sty"],
+                    "templatetype": [".sty"],
+                    "InputIfFileExists": [".ldf", ".tex", ".sty"],
+                    "includegraphics": [
+                        ".pdf",
+                        ".png",
+                        ".jpg",
+                        ".jpeg",
+                        ".eps",
+                    ],
+                }
+                exts = pref_exts.get(command, [])
+                chosen = None
+                for ext in exts:
+                    for c in canidates:
+                        if c.suffix.lower() == ext:
+                            chosen = c
+                            break
+                    if chosen is not None:
+                        break
+                if chosen is not None:
+                    full_path = chosen
+                else:
+                    # Fall back to first candidate deterministically
+                    full_path = sorted(canidates)[0]
 
         replacements[full_path.name] = full_path
         return updated
@@ -64,6 +114,7 @@ def flatten_latex(
     Returns the flattened LaTeX as a string.
     """
     scratch = scratch or TemporaryDirectory()
+    scratch_dir = getattr(scratch, "name", scratch)
     tex_path = Path(file_path).resolve()
     root = root or tex_path.parent
 
@@ -107,16 +158,16 @@ def flatten_latex(
         else:
             flattened_lines.append(line)
 
-    # Flatten Class files as well
-    cls_deps = {}
-    for name, file in dependencies.items():
-        if file.suffix == ".cls":
-            text, deps = flatten_latex(file)
-            fid = NamedTemporaryFile(dir=scratch, delete=False)
+    # Flatten class and style files to discover nested dependencies
+    nested_deps = {}
+    for name, file in list(dependencies.items()):
+        if file.suffix in {".cls", ".sty"}:
+            text, deps = flatten_latex(file, scratch=scratch)
+            fid = NamedTemporaryFile(dir=scratch_dir, delete=False)
             fid.write(text.encode("utf-8"))
             dependencies[name] = Path(fid.name)
-            cls_deps.update(deps)
-    dependencies.update(cls_deps)
+            nested_deps.update(deps)
+    dependencies.update(nested_deps)
 
     return "".join(flattened_lines), dependencies
 
