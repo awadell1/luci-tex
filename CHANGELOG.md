@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - archive: Resolve `.cls` vs `.bst` ambiguity and include nested local dependencies.
 - archive: Correctly handle `\input` commands wrapped inline by another commands
+- check: Flag undefined acronyms from the `acronym` package
 
 ### Tests
 - archive: Add coverage for `\documentclass` resolution.

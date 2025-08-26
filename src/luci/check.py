@@ -160,6 +160,28 @@ def _detect_reference(
     return Issue("Undefined reference", key, Severity.WARNING, None, (loc,))
 
 
+def _detect_acronym(
+    lines: list[str], i: int, line: str, current_file: Path | None
+) -> Issue | None:
+    # Example line:
+    # "Package acronym Warning: Acronym `EC' is not defined on input line 28."
+    if "Package acronym Warning:" not in line or "is not defined" not in line:
+        return None
+    m_key = re.search(r"Acronym [`']([^`']+)[`'] is not defined", line)
+    if not m_key:
+        return None
+    key = m_key.group(1)
+    lookahead = line + (lines[i + 1] if i + 1 < len(lines) else "")
+    m_line = _INPUT_LINE_RE.search(lookahead)
+    page_label = _next_page_label(lines, i)
+    loc = Location(
+        file=current_file if (m_line is not None) else None,
+        line=int(m_line.group(1)) if m_line else None,
+        page=page_label,
+    )
+    return Issue("Undefined acronym", key, Severity.WARNING, None, (loc,))
+
+
 def _detect_missing_file(
     lines: list[str], i: int, line: str, current_file: Path | None
 ) -> Issue | None:
@@ -204,7 +226,12 @@ def _scan_single_log(log_path: Path, *, overflow_threshold_pt: float) -> list[Is
     for i, line in enumerate(lines):
         current = context[i]
 
-        for det in (_detect_citation, _detect_reference, _detect_missing_file):
+        for det in (
+            _detect_citation,
+            _detect_reference,
+            _detect_acronym,
+            _detect_missing_file,
+        ):
             iss = det(lines, i, line, current)
             if iss is None:
                 continue
@@ -270,7 +297,7 @@ def check(
     """
     Check build artifacts for common LaTeX problems with low false positives.
 
-    - Scans .log files for undefined citations, references, and missing files.
+    - Scans .log files for undefined citations, references, acronyms and missing files.
     - Flags overfull h/v boxes above a configurable threshold (in points).
 
     Exit status is non-zero if any errors are found (or warnings when --strict).

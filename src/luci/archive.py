@@ -219,6 +219,10 @@ def scan_latex_log(log_path: Path):
             "pattern": r"LaTeX Warning: Reference [`']([^`']+)[`'] on page",
             "level": logging.WARNING,
         },
+        "Undefined Acronyms": {
+            "pattern": r"Package acronym Warning: Acronym [`']([^`']+)[`'] is not defined",
+            "level": logging.WARNING,
+        },
         "Missing Files": {
             "pattern": r"! LaTeX Error: File [`'](.+?)['`] not found.",
             "level": logging.ERROR,
