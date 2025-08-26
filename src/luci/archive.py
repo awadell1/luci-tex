@@ -150,11 +150,9 @@ def flatten_latex(
                 scratch=scratch,
             )
             dependencies.update(deps)
-            flattened_lines.append(included_text)
-
-            # Add any trailing content after the command on the same line
-            if post.strip():
-                flattened_lines.append(post + "\n")
+            # Preserve any prefix and postfix text on the line (e.g. macro wrappers)
+            # by reconstructing the full line with the flattened include inserted.
+            flattened_lines.append(pre + included_text + post + "\n")
         else:
             flattened_lines.append(line)
 

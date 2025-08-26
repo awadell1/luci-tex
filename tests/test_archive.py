@@ -67,3 +67,39 @@ def test_documentclass_prefers_cls_when_multiple_candidates(
     with zipfile.ZipFile(outzip) as zf:
         names = set(zf.namelist())
         assert "foo.cls" in names
+
+
+def test_inline_input_within_macro_is_preserved(
+    tmp_path: Path, cli_runner, monkeypatch: pytest.MonkeyPatch
+):
+    # Create a project where \input is used inside another macro argument
+    fm_dir = tmp_path / "frontmatter"
+    fm_dir.mkdir(parents=True, exist_ok=True)
+    (fm_dir / "title.tex").write_text("Awesome Paper", encoding="utf-8")
+
+    main = tmp_path / "main.tex"
+    main.write_text(
+        r"""
+        \documentclass{article}
+        \title{\input{frontmatter/title}}
+        \begin{document}
+        \maketitle
+        \end{document}
+        """,
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    outzip = tmp_path / "main.zip"
+    res = cli_runner.invoke(
+        cli,
+        ["archive", str(main), "--output", str(outzip), "--no-validate"],
+    )
+    assert res.exit_code == 0, res.stdout
+    assert outzip.exists()
+
+    # The flattened main.tex inside the archive should preserve the macro prefix
+    with zipfile.ZipFile(outzip) as zf:
+        data = zf.read("main.tex").decode("utf-8")
+        assert "\\title{" in data  # prefix preserved
+        assert "Awesome Paper" in data  # included content present
