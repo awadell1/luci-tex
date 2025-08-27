@@ -258,6 +258,14 @@ def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):
 def archive(
     main: Path, output: Path | None = None, validate: bool = True, bbl: bool = False
 ):
+    """
+    Create a zip archive of a LaTeX project by flattening inputs.
+
+    Flattens includes and strips paths from common commands to collect local
+    dependencies next to the main file, then zips them. With --validate, runs
+    `tectonic` on the archive to ensure it compiles; with --bbl, includes
+    generated .bbl files after a build.
+    """
     output = output or Path(main).with_suffix(".zip")
     with TemporaryDirectory() as scratch:
         main_text, deps = flatten_latex(main, scratch=scratch)
