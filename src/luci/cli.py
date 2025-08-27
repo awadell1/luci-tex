@@ -5,7 +5,12 @@ from .archive import archive
 from .bibtools import merge_and_dedupe, update_citation
 from .check import check
 
-cli = typer.Typer()
+cli = typer.Typer(
+    help=(
+        "Utilities for LaTeX projects: check logs, merge bibs, archive sources, "
+        "and consolidate acronyms."
+    )
+)
 
 cli.command("merge-bibs")(merge_and_dedupe)
 cli.command("fix-dups")(update_citation)

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- cli: Improve help text formatting and descriptions for all commands.
+
 ### Fixed
 - archive: Resolve `.cls` vs `.bst` ambiguity and include nested local dependencies.
 - archive: Correctly handle `\input` commands wrapped inline by another commands
