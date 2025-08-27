@@ -121,21 +121,59 @@ def _merge_issue(existing: Issue | None, inc: Issue) -> Issue:
 def _detect_citation(
     lines: list[str], i: int, line: str, current_file: Path | None
 ) -> Issue | None:
-    if "Warning: Citation" not in line or "undefined" not in line:
-        return None
-    m_key = re.search(r"[`'](.+?)['`]", line)
-    if not m_key:
-        return None
-    key = m_key.group(1)
-    lookahead = line + (lines[i + 1] if i + 1 < len(lines) else "")
-    m_line = _INPUT_LINE_RE.search(lookahead)
-    page_label = _next_page_label(lines, i)
-    loc = Location(
-        file=current_file if (m_line is not None) else None,
-        line=int(m_line.group(1)) if m_line else None,
-        page=page_label,
-    )
-    return Issue("Undefined citation", key, Severity.WARNING, None, (loc,))
+    # Common LaTeX pattern (natbib/latex kernel):
+    #   LaTeX Warning: Citation `key' on page N undefined on input line M.
+    if "Warning: Citation" in line and "undefined" in line:
+        m_key = re.search(r"[`'](.+?)['`]", line)
+        if not m_key:
+            return None
+        key = m_key.group(1)
+        lookahead = line + (lines[i + 1] if i + 1 < len(lines) else "")
+        m_line = _INPUT_LINE_RE.search(lookahead)
+        page_label = _next_page_label(lines, i)
+        loc = Location(
+            file=current_file if (m_line is not None) else None,
+            line=int(m_line.group(1)) if m_line else None,
+            page=page_label,
+        )
+        return Issue("Undefined citation", key, Severity.WARNING, None, (loc,))
+
+    # BibLaTeX split pattern seen in logs (two-line form):
+    #   (biblatex)                key
+    #   although it is yet undefined on input line M.
+    # Sometimes the order is reversed in noisy logs; we handle both.
+    # Case A: current line is the (biblatex) key marker and next mentions undefined
+    m_bib_key = re.match(r"^\(biblatex\)\s+(.+?)\s*$", line)
+    if m_bib_key:
+        key = m_bib_key.group(1)
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if "undefined" in nxt and "input line" in nxt:
+            m_line = _INPUT_LINE_RE.search(nxt)
+            page_label = _next_page_label(lines, i)
+            loc = Location(
+                file=current_file if (m_line is not None) else None,
+                line=int(m_line.group(1)) if m_line else None,
+                page=page_label,
+            )
+            return Issue("Undefined citation", key, Severity.WARNING, None, (loc,))
+
+    # Case B: current line notes undefined, and a recent prior line names the key
+    if "undefined" in line and "input line" in line:
+        back_limit = max(0, i - 5)
+        for j in range(i - 1, back_limit - 1, -1):
+            m_prev = re.match(r"^\(biblatex\)\s+(.+?)\s*$", lines[j])
+            if not m_prev:
+                continue
+            key = m_prev.group(1)
+            m_line = _INPUT_LINE_RE.search(line)
+            page_label = _next_page_label(lines, i)
+            loc = Location(
+                file=current_file if (m_line is not None) else None,
+                line=int(m_line.group(1)) if m_line else None,
+                page=page_label,
+            )
+            return Issue("Undefined citation", key, Severity.WARNING, None, (loc,))
+    return None
 
 
 def _detect_reference(
