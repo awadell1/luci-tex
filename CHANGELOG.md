@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - archive: Resolve `.cls` vs `.bst` ambiguity and include nested local dependencies.
 - archive: Correctly handle `\input` commands wrapped inline by another commands
 - check: Flag undefined acronyms from the `acronym` package
+- check: Detect biblatex-style split-line undefined citation warnings.
 
 ### Tests
 - archive: Add coverage for `\documentclass` resolution.
+- check: Added tests for undefined citations, references or missing files.
 
 ## [0.1.0] - 2025-08-18
 
