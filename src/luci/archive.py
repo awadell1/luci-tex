@@ -306,6 +306,14 @@ def archive(
     bbl: bool = False,
     bibstyle: BibStyle = BibStyle.bibtex,
 ):
+    """
+    Create a zip archive of a LaTeX project by flattening inputs.
+
+    Flattens includes and strips paths from common commands to collect local
+    dependencies next to the main file, then zips them. With --validate, runs
+    `tectonic` on the archive to ensure it compiles; with --bbl, includes
+    generated .bbl files after a build.
+    """
     output = output or Path(main).with_suffix(".zip")
     with TemporaryDirectory() as scratch:
         main_text, deps = flatten_latex(main, scratch=scratch)

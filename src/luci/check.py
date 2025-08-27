@@ -333,12 +333,13 @@ def check(
     ),
 ):
     """
-    Check build artifacts for common LaTeX problems with low false positives.
+    Check LaTeX .log files for common issues.
 
-    - Scans .log files for undefined citations, references, acronyms and missing files.
-    - Flags overfull h/v boxes above a configurable threshold (in points).
+    \b
+    - Undefined citations, references, acronyms, and missing files
+    - Overfull h/v boxes above a threshold (in points)
 
-    Exit status is non-zero if any errors are found (or warnings when --strict).
+    Exits with non-zero on errors (or warnings with --strict).
     """
     # Default base: prefer ./build if it exists
     if build_dir is None:
