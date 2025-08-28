@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 
 import pytest
+
 from luci import bibtools as bib
 from luci.cli import cli
-
 from tests.utils import write
 
 

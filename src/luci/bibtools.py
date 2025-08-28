@@ -131,7 +131,7 @@ def update_citation(duplicate_keys: Path, files: list[Path]):
         return f"{cite_command.split('{')[0]}{{{','.join(updated_keys)}}}"
 
     for file in files:
-        with open(file, "r") as f:
+        with open(file) as f:
             updated = []
             for line in f:
                 updated.append(cite_pattern.sub(replace_cite_keys, line))
