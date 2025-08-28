@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from luci.cli import cli
-
 from tests.utils import write
 
 

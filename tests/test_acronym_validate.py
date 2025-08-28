@@ -1,9 +1,10 @@
 import json
 import shutil
 from pathlib import Path
-from subprocess import CalledProcessError, run
+from subprocess import run
 
 import pytest
+
 from luci.cli import cli
 
 
