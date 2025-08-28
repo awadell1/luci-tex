@@ -23,7 +23,7 @@ DEFAULT_COMMANDS = [
 def strip_paths_from_command(
     latex_text: str, command: str
 ) -> tuple[str, dict[str, Path]]:
-    """
+    r"""
     Replaces \command{path/to/file} with \command{file} using pathlib,
     and returns a list of (original path, updated line) replacements.
 
@@ -111,7 +111,7 @@ def flatten_latex(
     root: Path | None = None,
     scratch=None,
 ):
-    """
+    r"""
     Recursively flattens a LaTeX file by replacing \input and \include with actual content.
     Returns the flattened LaTeX as a string.
     """
