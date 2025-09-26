@@ -23,5 +23,4 @@ repos:
       - id: ruff
         args:
           - --fix
-          - --select=I
       - id: ruff-format

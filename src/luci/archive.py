@@ -6,6 +6,8 @@ from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+from luci.check import scan_logs
+
 DEFAULT_COMMANDS = [
     "documentclass",
     "includegraphics",
@@ -21,7 +23,7 @@ DEFAULT_COMMANDS = [
 def strip_paths_from_command(
     latex_text: str, command: str
 ) -> tuple[str, dict[str, Path]]:
-    """
+    r"""
     Replaces \command{path/to/file} with \command{file} using pathlib,
     and returns a list of (original path, updated line) replacements.
 
@@ -109,7 +111,7 @@ def flatten_latex(
     root: Path | None = None,
     scratch=None,
 ):
-    """
+    r"""
     Recursively flattens a LaTeX file by replacing \input and \include with actual content.
     Returns the flattened LaTeX as a string.
     """
@@ -203,38 +205,10 @@ def validate_archive(archive: Path, mainfile: str):
                 print(log_file.read_text(), file=sys.stderr)
             raise RuntimeError("Archive valiation failed")
 
-        scan_latex_log(Path(temp_dir).joinpath(mainfile).with_suffix(".log"))
-
-
-def scan_latex_log(log_path: Path):
-    log_text = Path(log_path).read_text(encoding="utf-8")
-
-    # Define patterns and their reporting levels (compile lazily here)
-    patterns = {
-        "Undefined Citations": {
-            "pattern": r"(?:Package (?:natbib|biblatex) Warning: Citation|LaTeX Warning: Citation) [`'](.+?)['`].+undefined",
-            "level": logging.WARNING,
-        },
-        "Undefined References": {
-            "pattern": r"LaTeX Warning: Reference [`']([^`']+)[`'] on page",
-            "level": logging.WARNING,
-        },
-        "Undefined Acronyms": {
-            "pattern": r"Package acronym Warning: Acronym [`']([^`']+)[`'] is not defined",
-            "level": logging.WARNING,
-        },
-        "Missing Files": {
-            "pattern": r"! LaTeX Error: File [`'](.+?)['`] not found.",
-            "level": logging.ERROR,
-        },
-    }
-
-    for label, info in patterns.items():
-        regex = re.compile(info["pattern"], re.MULTILINE)
-        unique_matches = set(regex.findall(log_text))
-
-        if unique_matches:
-            logging.log(info["level"], "%s: %s", label, ", ".join(unique_matches))
+        scan_logs(
+            [Path(temp_dir).joinpath(mainfile).with_suffix(".log")],
+            overflow_threshold_pt=10,
+        )
 
 
 def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):

@@ -1,9 +1,9 @@
 import json
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
 
 import typer
 
@@ -312,11 +312,11 @@ def scan_logs(logs: Iterable[Path], *, overflow_threshold_pt: float) -> list[Iss
 
 
 def check(
-    logs: Optional[list[Path]] = typer.Argument(
+    logs: list[Path] | None = typer.Argument(
         None,
         help="One or more .log files to scan (shell globs supported). If omitted, searches ./build or CWD.",
     ),
-    build_dir: Optional[Path] = typer.Option(
+    build_dir: Path | None = typer.Option(
         None,
         help="Directory to search for LaTeX .log files when no files are provided. Defaults to ./build if present, else CWD.",
     ),
