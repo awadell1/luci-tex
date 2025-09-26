@@ -2,11 +2,14 @@ import logging
 import re
 import sys
 import zipfile
+from collections.abc import Callable, Iterable
+from enum import Enum
 from pathlib import Path
 from subprocess import run
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
-from luci.check import scan_logs
+from .bibparse import parse_bibliographies
+from .check import scan_logs
 
 DEFAULT_COMMANDS = [
     "documentclass",
@@ -172,6 +175,68 @@ def flatten_latex(
     return "".join(flattened_lines), dependencies
 
 
+def replace_citeauthor_commands(
+    latex_text: str,
+    bib_files: Iterable[Path],
+    max_names: int = 2,
+) -> str:
+    """Replace \\citeauthor and \\citeauthorcite commands with author text.
+
+    - ``\\citeauthor{foo}`` -> "<authors for foo>"
+    - ``\\citeauthorcite{foo}`` -> "<authors for foo>\\cite{foo}"
+
+    When an entry has more than ``max_names`` authors, only the first last name
+    is kept followed by " et al.". Otherwise, up to ``max_names`` last names
+    are joined with " and ".
+
+    Args:
+        latex_text: The flattened LaTeX text.
+        bib_files: Paths to .bib files referenced by the project.
+        max_names: Maximum number of last names to display before using et al.
+
+    Returns:
+        Updated LaTeX text with citeauthor macros replaced.
+    """
+    # Remove an inline macro definition for \citeauthorcite if present
+    # Exact macro semantics: \newcommand{\citeauthorcite}[1]{\citeauthor{#1}\cite{#1}}
+    macro_pat = re.compile(
+        r"\\newcommand\{\\citeauthorcite\}\[1\]\{\s*\\citeauthor\{#1\}\s*\\cite\{#1\}\s*\}",
+    )
+    text = macro_pat.sub("", latex_text)
+
+    # Build a key -> list[last names] map from provided bib files
+    authors = parse_bibliographies(bib_files)
+    # Convert to key -> display-string per max_names policy
+    author_map: dict[str, str] = {}
+    for key, last_names in authors.items():
+        if len(last_names) > max_names:
+            display = f"{last_names[0]} et al."
+        else:
+            display = " and ".join(last_names[:max_names])
+        author_map[key] = display
+
+    if not author_map:
+        return text
+
+    def render_authors(keys_str: str) -> str:
+        keys = [k.strip() for k in keys_str.split(",") if k.strip()]
+        rendered: list[str] = []
+        for k in keys:
+            rendered.append(author_map[k])
+        return ", ".join(rendered)
+
+    def repl_citeauthor(m: re.Match) -> str:
+        return render_authors(m.group(1))
+
+    def repl_citeauthorcite(m: re.Match) -> str:
+        keys_str = m.group(1)
+        return f"{render_authors(keys_str)}\\cite{{{keys_str}}}"
+
+    text = re.sub(r"\\citeauthor\{([^}]+)\}", repl_citeauthor, text)
+    text = re.sub(r"\\citeauthorcite\{([^}]+)\}", repl_citeauthorcite, text)
+    return text
+
+
 def create_archive(archive: str, files: dict[str, Path]):
     with zipfile.ZipFile(archive, "w") as zipf:
         for dst, src in files.items():
@@ -229,12 +294,29 @@ def add_bbl_file(archive: Path, main: str, deps: dict[str, Path]):
                 zipf.write(file, file.name)
 
 
+class BibStyle(Enum):
+    biblatex = "biblatex"
+    bibtex = "bibtex"
+
+
 def archive(
-    main: Path, output: Path | None = None, validate: bool = True, bbl: bool = False
+    main: Path,
+    output: Path | None = None,
+    validate: bool = True,
+    bbl: bool = False,
+    bibstyle: BibStyle = BibStyle.bibtex,
 ):
     output = output or Path(main).with_suffix(".zip")
     with TemporaryDirectory() as scratch:
         main_text, deps = flatten_latex(main, scratch=scratch)
+        # Post-process flattened text with additional passes (extensible)
+        bibs = [p for n, p in deps.items() if Path(n).suffix == ".bib"]
+        passes: list[Callable[[str], str]] = []
+        # Replace citeauthor-like commands using available bib files
+        if bibs and bibstyle == BibStyle.bibtex:
+            passes.append(lambda t: replace_citeauthor_commands(t, bibs))
+        for fn in passes:
+            main_text = fn(main_text)
         with NamedTemporaryFile(dir=scratch) as fid:
             fid.write(main_text.encode("utf-8"))
             fid.flush()
