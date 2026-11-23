@@ -5,6 +5,7 @@ from .archive import archive
 from .bibtools import merge_and_dedupe, update_citation
 from .check import check
 from .diff import diff
+from .wrap import wrap
 
 cli = typer.Typer(
     help=(
@@ -19,3 +20,4 @@ cli.command()(archive)
 cli.command()(merge_acronyms)
 cli.command()(check)
 cli.command()(diff)
+cli.command()(wrap)

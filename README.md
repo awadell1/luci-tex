@@ -26,6 +26,10 @@ luci --help
 * `fix-dups`: Fix duplicate citations.
 * `archive`: Archive the project.
 * `merge-acronyms`: Merge acronyms.
+* `wrap`: Collapse whitespace in a UTF-8 TeX file to a single line, preserving LaTeX commands.
+
+`luci wrap abstract.tex` prints the line to stdout. Add `--clip` to copy it to
+the clipboard, `--output abstract.txt` to save it, or both to copy and save it.
 
 ## Contributing
 

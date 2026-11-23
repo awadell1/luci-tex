@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- wrap: Write a TeX file as a single line to stdout, the clipboard, or a file.
 - diff: New `luci diff` subcommand to generate LaTeX diffs between a git ref
   and either the working tree or another ref. Produces `<stem>_old.tex`,
   `<stem>_new.tex`, and `<stem>_diff.tex` in `<stem>-diff/` by default, with
